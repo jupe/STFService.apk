@@ -13,7 +13,7 @@ jobs:
       - checkout
       - run:
           name: build
-          command: ./gradlew assembleDebug
+          command: TERM=xterm ./gradlew assembleDebug
       - store_artifacts:
           path: libs
           destination: libs
