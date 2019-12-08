@@ -1,0 +1,19 @@
+version: 2.1
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build
+jobs:
+  build:
+    docker:
+      - image: bitriseio/android-ndk:v2019_11_23-08_38-b1753
+    steps:
+      - checkout
+      - run:
+          name: build
+          command: TERM=xterm ./gradlew assembleDebug
+      - store_artifacts:
+          path: libs
+          destination: libs
