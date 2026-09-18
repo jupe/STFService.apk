@@ -1,9 +1,35 @@
 const assert = require('node:assert/strict')
+const childProcess = require('node:child_process')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
 const {test} = require('node:test')
 const {validateVersion, prepareRelease, releaseNotes} = require('./release')
 
 const manifest = {version: '2.5.6'}
 const gradle = 'versionCode 15\nversionName "2.5.6"\n'
+
+test('the release workflow publishes a local archive', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stfservice-publish-'))
+  t.after(() => fs.rmSync(directory, {recursive: true, force: true}))
+  fs.mkdirSync(path.join(directory, 'dist'))
+  fs.writeFileSync(path.join(directory, 'package.json'), JSON.stringify({name: 'stfservice-release-test', version: '0.0.0'}))
+  const packed = childProcess.spawnSync('npm', ['pack', '--ignore-scripts', '--offline', '--pack-destination', 'dist'], {
+    cwd: directory,
+    encoding: 'utf8'
+  })
+  assert.equal(packed.status, 0, packed.stderr)
+  const workflow = fs.readFileSync(path.join(__dirname, '../workflows/release.yml'), 'utf8')
+  const publish = workflow.match(/^        run: (npm publish .+)$/m)
+  assert.ok(publish, 'The release workflow must have an npm publish command')
+  const result = childProcess.spawnSync('bash', ['-c', `${publish[1]} --dry-run --offline --ignore-scripts --provenance=false`], {
+    cwd: directory,
+    encoding: 'utf8',
+    env: {...process.env, GIT_SSH_COMMAND: 'false', GIT_TERMINAL_PROMPT: '0'}
+  })
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /\+ stfservice-release-test@0\.0\.0/)
+})
 
 test('prepare requires an increasing stable version and the default branch', () => {
   for (const version of ['2.5.7', '2.10.0', '3.0.0']) {
